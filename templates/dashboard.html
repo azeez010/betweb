@@ -1,0 +1,180 @@
+{% extends "./base.html"%}
+{% block title %}Dashboard{% endblock %}
+{% block content%}
+<div class="bg-gray-200 py-4 h-full sm:px-4 md:px-24 mheight">
+
+    <!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+{% if current_user.is_authenticated %}
+<p class="sm:text-xl md:text-3xl">Welcome, {{ current_user.username }}</p>
+{% endif %}
+
+    <!-- <p>Pay the sum of #30,000.00 to this bank account and send a mail to dataslid@gmail.com attaching proof of payment and you will be sent a mail indicating that you can now download the paid version<p> -->
+    {% if current_user.bet_49ja.bot_type == "demo" %}
+            {% if current_user.bet_49ja.has_compiled %}
+                <p id="info">The bot has finished compiling click on the Download demo button download the demo, click on Buy to get the paid version</p> 
+                <button class="bg-gray-500 hover hover:bg-gray-700 shadow-sm:hover text-white p-1 rounded-lg sm:mt-1 md:mt-2 md:py-4 md:px-8 sm:py-2 sm:px-4 sm:text-sm md:text-lg" id="send_demo" is_download="true">Download demo</button>
+                <button class="bg-white border-2 border-gray-500 rounded-lg hover hover:bg-gray-700 shadow-sm:hover text-gray-500 p-1 rounded-lg sm:mt-1 md:mt-2 md:py-4 md:px-8 sm:py-2 sm:px-4 sm:text-sm md:text-lg" id="buy_bot">buy</button>
+            {% else %}
+                <p id="info" class="sm:text-sm md:text-2xl">Request for a Demo</p> 
+                <input placeholder="your bet9ja username" class="border-2 placeholder-text-lg border-gray-500 rounded-lg md:w-1/5 sm:3/5 px-4 mt-4 mb-2 md:py-4 sm:py-2 sm:px-2 "  id="name" type="text" required>
+                <select  class="sm:w-4/6 md:w-1/5 sm:py-2 md:py-4 rounded-lg border-2 border-gray-600 bg-white sm:px-4 md:px-12 my-4" name="admin" id="bot_type">
+                    <option value="" selected>Select the version of the bot your want</option>
+                    <option value="demo" selected>Demo</option>
+                    <option value="paid">Buy</option>
+                    <option value="subscribe">Subscription</option>
+                </select>
+                <p id="load"></p>
+                <div id="loader"></div>
+                <button class="bg-gray-500 hover hover:bg-gray-700 shadow-sm:hover text-white p-1 rounded-lg sm:mt-1 md:mt-2 md:py-4 md:px-8 sm:py-2 sm:px-4 sm:text-sm md:text-lg" id="send_demo">Compile</button>
+            {% endif %}
+        
+            {% elif current_user.bet_49ja.bot_type == "subscribe" %}
+        {% if current_user.bet_49ja.has_compiled %}
+                <p id="info">You already download the demo, pay to get the paid version</p> 
+                <a href="{{url_for('download')}}">Download Demo</a>
+            {% else %}
+                <p id="info" class="sm:text-sm md:text-2xl">Request for a Demo</p> 
+                <input placeholder="your bet9ja username" class="border-2 placeholder-text-lg border-gray-500 rounded-lg md:w-1/5 sm:3/5 px-4 mt-4 mb-2 md:py-4 sm:py-2 sm:px-2 "  id="name" type="text" required>
+                <select  class="sm:w-3/5 md:w-1/5 sm:py-1 md:py-4 rounded-lg border-2 border-gray-600 sm:px-2 md:px-12 my-4" name="admin" id="bot_type">
+                    <option value="" selected>Select the version of the bot your want</option>
+                    <option value="demo" selected>Demo</option>
+                    <option value="paid">Buy</option>
+                    <option value="subscribe">Subscription</option>
+                </select>
+                <p id="load"></p>
+                <div id="loader"></div>
+                <button class="bg-gray-500 hover hover:bg-gray-700 shadow-sm:hover text-white p-1 rounded-lg sm:mt-1 md:mt-2 md:py-4 md:px-8 sm:py-2 sm:px-4 sm:text-sm md:text-lg" id="send_demo">Compile</button>
+            {% endif %}
+        
+        {% elif current_user.bet_49ja.bot_type == "paid" %}
+            {% if current_user.bet_49ja.has_compiled %}
+            <!-- is_updated -->
+                <p id="info">You have already compiled your paid version, click below to download</p> 
+                <a href="{{url_for('download')}}">Download Demo</a>
+            {% else%}    
+                <p class="">Download the latest version of 49ja bot</p> 
+                <input placeholder="your bet9ja username" class="border-2 border-gray-500 rounded-lg w-1/5 px-4 mt-4 mb-2 py-4 placeholder-green-100"  id="name" type="text" required>
+                <p id="load"></p>
+                <div id="loader"></div>
+                <button class="bg-gray-500 hover hover:bg-gray-700 shadow-sm:hover text-white p-1 mt-2 py-4 px-8 rounded-lg" id="send_paid">Compile</button>
+            {% endif %}
+        {% endif %}
+    
+    
+    </div>    
+{% if not current_user.bet_49ja.is_paid_bot %}
+    <script>
+        let bot_type = document.getElementById("bot_type")
+        let info = document.getElementById("info")
+        let send = document.getElementById("send_demo")
+        // Checking the element exists in the dom
+        if(bot_type){
+        bot_type.addEventListener("change", ()=>{
+            switch(bot_type.value){
+                case "":
+                    info.innerHTML = "Select the version of the bot you want";
+                    send.innerText = "select a version"
+                    break;
+                case "demo":
+                    info.innerHTML = "Request for a Demo";
+                    send.innerText = "Compile"
+                    break;
+                case "paid":
+                    {% if not current_user.has_paid %}
+                        info.innerHTML = "<p>Pay to get the paid version of this bot, which cost #30,000<br>Eligibility: <span class='text-red-600'>INACTIVE - You have to pay to download the bot</span></p>"
+                        send.innerText = "Buy"
+                    {% else %}
+                        info.innerHTML = "<p>Pay to get the paid version of this bot, which cost #30,000<br>Eligibility: <span class='text-green-600'>ACTIVE - You can download</span></p>"
+                    {% endif %}
+                    break;
+                case "subscribe": 
+                    info.innerText = "Download the subscription version of our 49ja bot, which cost #5,000"
+                    send.innerText = "Subscribe"
+                    break;
+                }
+            })
+        }
+        
+
+    </script>
+      <script>
+        let loading = document.getElementById("load")
+        let demo_button = document.getElementById("send_demo")
+        let buy_bot = document.getElementById("buy_bot")
+        console.log(buy_bot)
+        if(buy_bot){
+            buy_bot.addEventListener("click", async () =>{
+                     window.location.href = "https://paystack.com/pay/ll69v4a7z1"
+            })
+        }
+        demo_button.addEventListener("click", async () =>{
+            try{
+                let name = document.getElementById("name").value
+            }
+            catch(e){
+                console.log(e)
+            }
+            if(demo_button.innerText == "Buy"){
+                 window.location.href = "https://paystack.com/pay/ll69v4a7z1"
+            }
+            else if(demo_button.innerText == "Download demo" && demo_button.getAttribute("is_download") == "true"){
+                alert("downloading")
+            }
+            else{
+                if(name){
+                    if((/\s/).test(name)) return alert(`your bet9ja username must not contain space`)
+                    
+                    loading.innerHTML = "Loading, currently building the app this might take a while, Visit <a href='http://www.africonn.com' class='text-blue-500' target='_blank'>www.africonn.com</a> for the main time... or you close the table for now you will be sent a mail when done building"
+                    $("#loader").show()
+                    // // let res = await fetch(`http://localhost:5000/paid?q=${name}`)
+                    let origin_url = window.location.origin
+                    let res = await fetch(`http://localhost:5000/get-bot?q=${name}&v=demo&url=${origin_url}&user_id={{current_user.id}}`)
+                    console.log(res)
+                    $("#loader").hide()
+                    if(res.ok){
+                        loading.innerText = ""
+                        loading.innerHTML = "The has finished compiling click on the Download demo button to download the bot"
+                        demo_button.innerText = "Download demo"
+                        demo_button.setAttribute("is_download", "true")
+                    } 
+                    else{
+                        loading.innerText = ""
+                        loading.innerHTML = "Something went wrong while trying to compile app, please try again"
+                        demo_button.innerText = "compile"
+                    }
+                }
+                else{
+                    alert("You must enter user bet9ja username")
+                }
+            }
+        })
+    </script>
+    {% else %}
+    <script>
+        let loading = document.getElementById("load")
+        let paid_button = document.getElementById("send_paid")
+        paid_button.addEventListener("click", async () =>{
+            let name = document.getElementById("name").value
+            if(name){
+                if((/\s/).test(name)) return alert(`your bet9ja username must not contain space`)
+                loading.innerText = "Loading, currently building the app this might take a while, Visit <a href='www.africonn.com'>africonn.com</a> for the main time..."
+                $("#loader").show()
+                for(let i = 0; i < 1000000000; i++){
+                    console.log(i)
+                }
+                // let res = await fetch(`http://localhost:5000/paid?q=${name}`)
+                console.log(res)
+                $("#loader").hide()
+                if(res.ok) loading.innerText = ""
+            }
+            else{
+                alert("You must enter user bet9ja username")
+            }
+        })
+    </script>
+    {% endif %}
+{% endblock %}

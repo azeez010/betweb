@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/1.9.6/tailwind.min.css"> -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script> -->
+    <script src="static/jquery-3.2.1.min.js"></script>
+    <link rel="stylesheet" href="./static/tailwind.css">
+    <link rel="shortcut icon" href="static/fav.png" type="image/x-icon">
+    <!-- ./static/tailwind.css -->
+    <title>{% block title %}{% endblock %}</title>
+</head>
+<style>
+    *{
+        margin: 0;
+    }
+    .flexI, .flexnav {
+        display: flex;
+        justify-content: space-between;
+    }
+    .xxl{
+        border-radius: 25px;
+    }
+    .grid{
+        display: grid;
+        grid-template-columns: 4fr 8fr;
+    }
+    .ungrid{
+        display: grid;
+        grid-template-columns: 5fr 4fr;
+    }
+    .mheight{
+        height: 90vh;
+    }
+
+    label{
+        font-size: 24px;
+    }
+    .cancelButton{
+        cursor: pointer;
+        margin-top: -10px;
+    }
+    input::placeholder, input, textarea{
+        font-size: 24px;
+        padding-left: 8px;
+        background-color: white;
+    }
+
+    select {
+        font-size: 20px;
+        padding-left: 8px;
+    }
+
+    button{
+        font-size: 18px;
+    }
+
+#loader {
+  border: 6px solid #939493;
+  border-radius: 50%;
+  border-top: 6px solid #3a3939;
+  width: 60px;
+  height: 60px;
+  -webkit-animation: spin 2s linear infinite; /* Safari */
+  animation: spin 2s linear infinite;
+  display: none;
+}
+
+/* Safari */
+@-webkit-keyframes spin {
+  0% { -webkit-transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.qa{
+    height: 50px;
+    width: 150px;
+}
+
+@media (max-width: 680px) {
+    input::placeholder, input, textarea{
+        font-size: 15px;
+        padding-left: 4px;
+        background-color: white;
+    }
+
+    label{
+        font-size: 18px;
+    }
+    select {
+        font-size: 14px;
+        padding-left: 2px;
+    }
+
+    button{
+        font-size: 18px;
+    }
+    .grid{
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+    .ungrid{
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+    .qa{
+        height: 45px;
+        width: 140px;
+    }
+    .flexI {
+        display: block;
+    }
+}
+
+</style>
+<body>
+    <div>
+            <div class="w-full  mb-4 flexnav sm:px-2 md:px-20 sm:pt-2 sm:pb-1 md:pt-4 md:pb-4 ">
+                <!-- sm:px-0 -->
+                <div>
+                    <a href="/home"><img src="/static/logo.jpg" class="sm:h-8 sm:w-24 md:h-16 md:w-48 " alt="logo"></a>
+                </div>
+                <div class="sm:mt-0 md:mt-3">
+                    <div class="sm:block md:hidden" id="navbar">
+                        <div class="h-1 w-12 bg-green-400 my-2" id="topbar"></div>
+                        <div class="h-1 w-12 bg-green-400 my-1" id="middlebar"></div>
+                        <div class="h-1 w-12 bg-green-400 my-2" id="bottombar"></div>
+                    </div>    
+                    <ul  class="float-right mx-2 sm:hidden md:hidden lg:block">
+                        {% if current_user.is_authenticated %}
+                            <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('home')}}">Home</a>                
+                            <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('dashboard')}}">Dashboard</a>
+                            <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('testimony')}}">Testimonies</a>                
+                            <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('make_request')}}">Make requests</a>
+                            {% if current_user.is_authenticated %}
+                                {% if current_user.is_admin %}
+                                    <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="/admin">Admin tab</a>
+                                    {% if alert %}
+                                        <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('new_request')}}">Requests <span class="text-red-500">NEW!</span></a>
+                                    {% else %}
+                                        <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('new_request')}}">Requests</a>
+                                    {% endif %}
+                                {% endif %}
+                                <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('logout')}}">logout</a>
+                            {% endif %}
+                        {% else %}
+                            <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('home')}}">Home</a>                
+                            <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('testimony')}}">Testimonies</a>                
+                            <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('make_request')}}">Make requests</a>
+                            {% if current_user.is_authenticated %}
+                                {% if current_user.is_admin %}
+                                    <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="/admin">Admin tab</a>
+                                    {% if alert %}
+                                        <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('new_request')}}">Requests <span class="text-red-500">NEW!</span></a>
+                                    {% else %}
+                                        <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('new_request')}}">Requests</a>
+                                    {% endif %}
+                                {% endif %}
+                                <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('logout')}}">Logout</a>
+                            {% endif %}
+                            <a class="md:mx-2 text-green-900 md:text-2xl sm:text-lg sm:center sm:px-4 sm:py-1 font-normal sm:block md:inline" href="{{url_for('signup')}}">Sign up</a>
+                            <a class="md:mx-2 border-green-600 sm:border-0 md:border-2 sm:text-green-900 md:text-green-600 sm:px-4 sm:py-1 md:px-6 md:py-2 md:text-2xl sm:text-lg font-normal rounded-xl xxl " href="{{url_for('login')}}">Login</a>
+                        {% endif %}
+                    </ul>    
+                </div>
+            </div>
+            <div id="insertNav" class="hidden"></div>
+        {% with messages=get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <p class="rounded-lg bg-white py-4 my-4 border-16 border-gray-200 px-8 text-gray-600 sm:text-md md:text-2xl cursor">{{ message }}<span class="text-5xl text-gray-600 hover:text-gray-700 float-right cancelButton" id="cancel">&times;</span></p>
+                {% endfor %}
+            {% endif %}
+        {% endwith%}
+        {% block content %}{% endblock %}
+    </div>
+    <footer class="sm:py-2 md:py-8 sm:px-8 md:px-128 sm:block flexI sm:block md:flex bg-gray-700">
+        <div>
+            <a href="http://www.africonn.com" target="_blank" class="text-gray-100 text-md">www.africonn.com</a><br>
+            <a href="https://www.youtube.com/channel/UC2CnO0lfpt6w7zbHTZE6BzA" target="_blank" class="text-gray-100 text-md">Dataslid Youtube Channel</a>
+        </div>
+        <div class="text-gray-100 text-md">
+            Dataslid digitals, Mokola, Ibadan
+        </div>
+    </footer>
+</body>
+<script>
+    $("#insertNav").html($("ul").html())
+    let f = false
+    $("#navbar").click(function(){
+        if(!f){
+            f = true
+            $("#insertNav").show()
+            
+        }
+        else{
+            $("#insertNav").hide()
+            f = false
+        }
+    })
+    $("#cancel").click(function(){
+        $(this).parent().hide()
+    })
+</script>
+</html>
