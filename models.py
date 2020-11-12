@@ -4,8 +4,8 @@ from flask_login import LoginManager, login_required, login_user, logout_user, c
 from datetime import datetime
 app = Flask(__name__)
 
-
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://azeez:azeez007@localhost/bot'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://azeez:azeez007@localhost/bot'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://dataslid$:dataslid@2020@dataslid.mysql.pythonanywhere-services.com/bot'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
 app.config['SECRET_KEY'] = "d27e0926-13d9-11eb-900d-18f46ae7891e"
 app.config['TOKEN_EXPIRY_TIME'] = "10"
