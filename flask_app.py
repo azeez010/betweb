@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory, render_template, flash, redirect, url_for
 from passlib.hash import md5_crypt
 from forms import MyForm, LoginForm, TestimonyForm 
-from models import User, Make_request, Testimonial, app, db, LoginManager, login_required, login_user, logout_user, current_user, Bet_49ja 
+from models import User, Make_request, Testimonial, app, db, LoginManager, login_required, login_user, logout_user, current_user, Bet_49ja, Financial_data 
 from bet_49ja import bet_49ja_script
 from is_safe_url import is_safe_url
 import os
@@ -12,6 +12,10 @@ from datetime import datetime
 import time
 
 
+import request_func
+import mailing_server
+from mailing_server import mail_folks
+import basic_auth 
 # flash msg = Message('Hello', sender = 'dataslid@gmail.com', recipients = [email])
 # msg.body = f"Hello Flask message sent from Flask-Mail, the token is {random_generated} "
 # self.mail.send(msg)
@@ -235,7 +239,7 @@ def create():
 
 @app.route("/get-bot", methods=["POST", "GET"])
 @login_required
-def create_demo():
+def compile_and_upload_bot():
     name = request.args.get("q")
     version = request.args.get("v")
     userId = request.args.get("user_id")
@@ -248,43 +252,42 @@ def create_demo():
     if version == "demo":
         os.system(f"workon flask & pyinstaller --onefile --clean --name={name}_49ja_demo {name}.py") 
         if "49ja_folder" in os.listdir():
-            create_app(name)
+            app_name = create_app(name)
+            upload_to_s3(app_name)
         else:
             os.system("mkdir 49ja_folder")
-            create_app(name)
-        #     app_name = f"{name}_49ja_demo.exe"
-        #     # Delete the application if it already exists
-        #     if  app_name in os.listdir(os.path.join(os.getcwd(), "49ja_folder")):
-        #         os.remove(os.path.join(os.getcwd(), "49ja_folder", app_name))
-        #     shutil.move(os.path.join(os.getcwd(), "dist", f"{name}_49ja_demo.exe"), os.path.join(os.getcwd(), "49ja_folder"))
-        #     os.remove(os.path.join(os.getcwd(), f"{name}_49ja_demo.spec"))
-        #     os.remove(os.path.join(os.getcwd(), f"{name}.py"))
-            
-        #     # Remove the remaining folder of dist
-        #     for directory, folder, files in os.walk(os.path.join(os.getcwd(), "dist")):            
-        #         for each_file in files:
-        #             os.remove(os.path.join(directory, each_file))
-        #     # Remove the remaining folder of build 
-        #     for i in os.listdir(os.path.join(os.getcwd(), "build")):
-        #         os.rmdir(os.path.join(os.getcwd(), "build", i))
-            
-        #     # Remove all the remaining files of build
-        #     for directory, folder, files in os.walk(os.path.join(os.getcwd(), "build")):
-        #         for each_file in files:
-        #             os.remove(os.path.join(directory, each_file))
-
-        #     os.rmdir(os.path.join(os.getcwd(), "build"))
-        #     os.rmdir(os.path.join(os.getcwd(), "dist"))
-            
-        #     demo_path = os.path.join(os.getcwd(), "49ja_folder", app_name)
-        #     demo_info = Demo_49ja(user_id=current_user.id, has_demo=True, demo=demo_path)
-        #     db.session.add(demo_info)
-        #     db.session.commit()
+            app_name = create_app(name, version)
+            # Upload the file generate to s3
+            upload_to_s3(app_name)
         
     return f"{name}_demo.py created"
 
-def create_app(name):
-    app_name = f"{name}_49ja_demo.exe"
+def upload_to_s3():
+    aws_key= "AKIA5NZ7IZHALP2IU3MI",
+    EMAIL = "dataslid@gmail.com",
+    aws_secret = "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",
+    AWS_STORAGE_BUCKET_NAME = "betbots",
+    DB_PASSWORD = "dataslid007"
+    conn = boto3.client(
+        's3',
+        aws_access_key_id="AKIA5NZ7IZHALP2IU3MI",
+        aws_secret_access_key="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"
+
+        )
+    bucket_name = "betbots"
+    filename = os.path.join(os.getcwd(), "49ja_folder", name)
+    file_folder = f'demo_49ja/{name}'
+    conn.upload_file(filename, bucket_name, file_folder)
+    
+    return "success"
+
+def create_app(name, version):
+    if version == "demo":
+        app_name = f"{name}_49ja_demo.exe"
+    elif version == "paid":
+        pass
+    elif version == "subscribe":
+        pass
     # Delete the application if it already exists
     if  app_name in os.listdir(os.path.join(os.getcwd(), "49ja_folder")):
         os.remove(os.path.join(os.getcwd(), "49ja_folder", app_name))
@@ -315,7 +318,30 @@ def create_app(name):
     bot_info.has_compiled = True 
     bot_info.bot_path = bot_path
     db.session.commit()
+    return app_name
 
+
+@app.route("/subscribe", methods=["GET"])
+def subscribe():
+    user_id = request.args.get("q")
+    price = request.args.get("price")
+    expire_time = time.time() + (86400 * 31 )
+    user_sub = Bet_49ja.query.filter_by(user_id=user_id).first()
+    user_sub.is_subscribe = True
+    user_sub.bot_type = "subscribe"
+    user_sub.sub_exp_date = expire_time
+    fin_data = Financial_data(price=price, user_id=user_id, bot_type="subscribe", datetime=datetime.now())
+    db.session.add(fin_data)
+    db.session.commit()
+    email = fin_data.user.email
+    subject = "Thanks for subscribing to Dataslid 49ja bot for this month"
+    message = "We are glad that you subcribed to our 49ja's monthly plans, follow a bankroll, be consistent by runing the bot daily and at the end you will be glad you that you subcribed"
+    try:
+        mail_folks(email, subject, message)
+        mail_folks("dataslid@gmail.com", "someone just subscribed to the 49ja bot", f"We just made {price} because {fin_data.user.username} subscribed to the 49ja bots")
+    except Exception as exc:
+        return jsonify({"ok": "true", "err": f"something went wrong {str(exc)}"})    
+    return jsonify({"ok": "true"})
 
 @app.route("/has_subscribed", methods=["GET"])
 def check_subscription():
@@ -330,13 +356,7 @@ def check_subscription():
     else:
         return jsonify({"result": ""})
 
-@app.route("/subscribe", methods=["GET"])
-def subscribe():
-    pass
 
-import request_func
-import mailing_server
-import basic_auth 
 
 @app.route("/download", methods=["POST", "GET"])
 @login_required

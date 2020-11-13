@@ -2,12 +2,6 @@
 {% block title %}Dashboard{% endblock %}
 {% block content%}
 <div class="bg-gray-200 py-4 h-full sm:px-4 md:px-24 mheight">
-
-    <!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
 {% if current_user.is_authenticated %}
 <p class="sm:text-xl md:text-3xl">Welcome, {{ current_user.username }}</p>
 {% endif %}
@@ -60,7 +54,7 @@
                 <input placeholder="your bet9ja username" class="border-2 border-gray-500 rounded-lg w-1/5 px-4 mt-4 mb-2 py-4 placeholder-green-100"  id="name" type="text" required>
                 <p id="load"></p>
                 <div id="loader"></div>
-                <button class="bg-gray-500 hover hover:bg-gray-700 shadow-sm:hover text-white p-1 mt-2 py-4 px-8 rounded-lg" id="send_paid">Compile</button>
+                <button class="bg-gray-500 hover hover:bg-gray-700 shadow-sm:hover text-white p-1 mt-2 py-4 px-8 rounded-lg" id="send_paid">Download Bot</button>
             {% endif %}
         {% endif %}
     
@@ -102,6 +96,7 @@
 
     </script>
       <script>
+        // window.addEventListener("load", )
         let loading = document.getElementById("load")
         let demo_button = document.getElementById("send_demo")
         let buy_bot = document.getElementById("buy_bot")
@@ -113,11 +108,12 @@
         }
         demo_button.addEventListener("click", async () =>{
             try{
-                let name = document.getElementById("name").value
+                var name = document.getElementById("name").value
             }
             catch(e){
                 console.log(e)
             }
+
             if(demo_button.innerText == "Buy"){
                  window.location.href = "https://paystack.com/pay/ll69v4a7z1"
             }

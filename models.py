@@ -2,16 +2,22 @@ from flask_sqlalchemy import SQLAlchemy
 from flask import Flask, request, jsonify
 from flask_login import LoginManager, login_required, login_user, logout_user, current_user, UserMixin
 from datetime import datetime
+from flask_script import Manager
+from flask_migrate import Migrate, MigrateCommand
 app = Flask(__name__)
 
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://azeez:azeez007@localhost/bot'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://dataslid$:dataslid@2020@dataslid.mysql.pythonanywhere-services.com/bot'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://dataslid:azeez007@dataslid.mysql.pythonanywhere-services.com/dataslid$betbot'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
 app.config['SECRET_KEY'] = "d27e0926-13d9-11eb-900d-18f46ae7891e"
 app.config['TOKEN_EXPIRY_TIME'] = "10"
 
 
 db = SQLAlchemy(app)
+
+migrate = Migrate(app, db)
+manager = Manager(app)
+manager.add_command('db', MigrateCommand)
 
 class User(db.Model, UserMixin ):
     __tablename__ = 'user'
@@ -57,8 +63,8 @@ class Reset_password(db.Model):
     __tablename__ = 'reset_password'
     id = db.Column(db.Integer, primary_key=True)
     user  = db.relationship(User, backref='reset_password', lazy=True)
-    mail = db.Column(db.String(100))
     user_id = db.Column(db.Integer(), db.ForeignKey(User.id))
+    mail = db.Column(db.String(100))
     dateTime = db.Column(db.String(500), default=0)
     token = db.Column(db.String(150))
     
@@ -83,3 +89,15 @@ class Subcribe_pin(db.Model):
     token = db.Column(db.String(150))
     datetime = db.Column(db.DateTime, default=datetime.now())
     
+
+class Financial_data(db.Model):
+    __tablename__ = 'financial_data'
+    id = db.Column(db.Integer, primary_key=True)
+    user  = db.relationship(User, backref='financial_data', lazy=True)
+    user_id = db.Column(db.Integer(), db.ForeignKey(User.id))
+    datetime = db.Column(db.DateTime, default=datetime.now())
+    price = db.Column(db.String(15))
+    bot_type = db.Column(db.String(60))
+
+if __name__ == '__main__':
+    manager.run()

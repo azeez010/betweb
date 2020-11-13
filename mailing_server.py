@@ -31,3 +31,15 @@ def mail_user():
         return jsonify({"ok": "true"})
     except Exception as exc:
         return jsonify({"ok": ""})
+
+def mail_folks(recipient, subject, message):
+    try:
+        msg = Message(subject, sender = 'dataslid@gmail.com', recipients = [recipient])
+        msg.body = message
+        msg.html = render_template('mail_template.html', message=message)
+        mail.send(msg)
+        # print("okay...")
+        return {"ok": "true"}
+    except Exception as exc:
+        print(f"fail... {str(exc)}")
+        return {"ok": ""}
