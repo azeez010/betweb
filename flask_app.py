@@ -87,7 +87,7 @@ def main():
     # print(dir(request))
     email = current_user.email
     
-    paystack_secret = os.environ.get("paystack_test")
+    paystack_secret = os.environ.get("paystack_live")
     bot_price = 25000 * 100
     #Instantiate the transaction object to handle transactions.  
     #Pass in your authorization key - if not set as environment variable PAYSTACK_AUTHORIZATION_KEY
