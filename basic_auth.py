@@ -1,14 +1,25 @@
 import uuid, json, time
-from models import db, app, Confirm_mail, User, Reset_password, current_user
-from mailing_server import Message, mail
+from models import db, app, Confirm_mail, Transaction_Table, User, Reset_password, current_user, Bet_49ja, Make_request
+from mailing_server import mail_folks, Message, mail
 from passlib.hash import md5_crypt
 from flask import url_for, request, render_template, redirect, flash, send_from_directory, send_file, jsonify, Response
 import boto3, os, botocore
 from forms import passwordResetForm, passwordReset
-
+import io
 from forms import MyForm, LoginForm, TestimonyForm 
+from flask_admin import Admin
+from flask_admin.contrib.sqla import ModelView
+
+admin = Admin(app)
+admin.add_view(ModelView(Transaction_Table, db.session))
+admin.add_view(ModelView(User, db.session))
+admin.add_view(ModelView(Bet_49ja, db.session))
+admin.add_view(ModelView(Make_request, db.session))
+# admin.add_view(ModelView(Make_request, db.session))
+
+
 # flash
-# @app.route("/signup", methods=["GET", "POST"])
+# @app.route("/signup", methds=[o"GET", "POST"])
 # def signup():
 # # def authenticate_mail():
 #     if current_user.is_authenticated:
@@ -107,7 +118,6 @@ def enter_reset_password():
                 user_id = request.args.get("i")
                 user = User.query.filter_by(id=user_id).first()
                 user.password = password
-
                 delete_confirm = Reset_password.query.filter_by(mail=user.email).all()
                 for each_delete_confirm in delete_confirm:
                     db.session.delete(each_delete_confirm)
@@ -140,13 +150,14 @@ def reset_password():
             db.session.add(resetPass)
             db.session.commit()
             try:
-                msg = Message("Reset password from betbots", sender = 'dataslid@gmail.com', recipients = [email])
                 message = f"Hello Flask message sent from Flask-Mail, the token is {random_generated}, it expires in {expired_token / 60} hours"
+                # mail_folks(email, "Reset password from betbots", message)
+                msg = Message("Reset password from betbots", sender = 'dataslid@gmail.com', recipients = [email])
                 msg.body = render_template('mail_template.txt', message=message)
                 msg.html = render_template('mail_template.html', message=message)
                 mail.send(msg)
             except Exception as exc:
-                print(exc)
+                print(str(exc))
                 return jsonify({"ok": '', "msg": 'Oops! mail failed to send sue to Network issues'})
 
             # flash("The token has been sent to your mail successfully")
@@ -169,9 +180,7 @@ def confirm_reset_password():
             return confirm_message
 
         else:
-            # success msg
             confirm_message = { "success": "your account has been verified successfully, you can now change password" }
-            # confirm_message = { "success": "your account has been verified successfully" }
             return confirm_message
 
 # @app.route('/reset-password-confirm')
@@ -198,53 +207,25 @@ def confirm_reset_password():
     #     print("HAAAAA")
     # return render_template("sign_up.html", form=form)
 
-@app.route("/ask", methods=["GET", "POST"])
-def ask():
-    aws_key= "AKIA5NZ7IZHALP2IU3MI",
-    EMAIL = "dataslid@gmail.com",
-    aws_secret = "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",
-    AWS_STORAGE_BUCKET_NAME = "betbots",
-    DB_PASSWORD = "dataslid007"
-    conn = boto3.client(
-        's3',
-        aws_access_key_id="AKIA5NZ7IZHALP2IU3MI",
-        aws_secret_access_key="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"
-        # endpoint_url='https://s3.console.aws.amazon.com',
-        # region_name="us-east-1",
-        # aws_secret_access_key=AWS_SECRET
-        )
-    bucket_name = "betbots"
-    name = "home.html"
-    filename = os.path.join(os.getcwd(), "templates", name)
-    print(filename)
-    file_folder = f'demo_49ja/{name}'
-    conn.upload_file(filename, bucket_name, file_folder)
-    # file location, thee
-
-    return "success"
    
 
-# @app.route("/download", methods=["GET", "POST"])
-# def download_file():
-#     conn = boto3.client("s3",
-#     aws_access_key_id="AKIA5NZ7IZHALP2IU3MI",
-#     aws_secret_access_key="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")
-
-#     s3 = boto3.resource('s3',
-#     aws_access_key_id="AKIA5NZ7IZHALP2IU3MI",
-#     aws_secret_access_key="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",
-#     )
-
-#     bucket_name = 'betbots'
-#     bucket = s3.Bucket(bucket_name)
-#     KEY = os.urandom(32)
-#     for obj in bucket.objects.all():
-#         filename = obj.key.rsplit('/')[-1]
-#         if str(obj.key.rsplit('/')[-1]).endswith(".html"):
-#             print(f" objkey {filename}")
-#             data = conn.get_object(Bucket='betbots', Key=f"demo_49ja/{filename}")
-#             break
-       
-#     read_data = data['Body'].read()   
-#     return Response(read_data, mimetype='text/html', headers={'Content-Disposition': 'attachment', 'filename': filename })
+@app.route("/download", methods=["GET", "POST"])
+def download():
+    storage_key = os.environ.get("aws_key")
+    storage_secret = os.environ.get("aws_secret")
+    storage_bucket = "betbots"
+    user_id = current_user.id
+    getUser = User.query.get(user_id)
+    conn = boto3.client(
+            's3',
+        aws_access_key_id=storage_key,
+        aws_secret_access_key=storage_secret
+            )
     
+    key = getUser.bet_49ja.bot_path
+    filename = key.split('/')[1]
+    bucket_name = 'betbots'
+    data = conn.get_object(Bucket='betbots', Key=key)
+    # application/zip
+    read_data = data['Body']
+    return send_file(read_data, mimetype='application/x-msdownload', attachment_filename=filename, as_attachment=True)

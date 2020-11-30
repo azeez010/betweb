@@ -4,10 +4,15 @@ from flask_login import LoginManager, login_required, login_user, logout_user, c
 from datetime import datetime
 from flask_script import Manager
 from flask_migrate import Migrate, MigrateCommand
+
+
 app = Flask(__name__)
 
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://azeez:azeez007@localhost/bot'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://dataslid:azeez007@dataslid.mysql.pythonanywhere-services.com/dataslid$betbot'
+
+
+
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://azeez:azeez007@localhost/bot'
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://dataslid:azeez007@dataslid.mysql.pythonanywhere-services.com/dataslid$betbot'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
 app.config['SECRET_KEY'] = "d27e0926-13d9-11eb-900d-18f46ae7891e"
 app.config['TOKEN_EXPIRY_TIME'] = "10"
@@ -28,17 +33,33 @@ class User(db.Model, UserMixin ):
     email = db.Column(db.String(200))
     password = db.Column(db.String(150))
 
+class Transaction_Table(db.Model):
+    __tablename__ = 'transactions'
+    id = db.Column(db.Integer, primary_key=True)
+    ref_no = db.Column(db.String(50))
+    amount = db.Column(db.String(15))
+    # For recurring charges
+    auth_code = db.Column(db.String(30))
+    email = db.Column(db.String(30))
+    cus_code = db.Column(db.String(30))
+    paid_at = db.Column(db.String(80))
+    # paid = db.Column(db.String(80))
+
+    
+
 class Bet_49ja(db.Model):
     __tablename__ = "bet_49ja"
     id = db.Column(db.Integer, primary_key=True)
     user  = db.relationship(User, backref=db.backref('bet_49ja', uselist=False), lazy=True)
     user_id = db.Column(db.Integer(), db.ForeignKey(User.id))
-    is_updated = db.Column(db.Boolean, default=False)
+    is_building = db.Column(db.Boolean, default=False)
     has_compiled = db.Column(db.Boolean, default=False)
+    bet9ja_username = db.Column(db.String(200))
     is_demo  = db.Column(db.Boolean, default=True)
     is_paid_bot = db.Column(db.Boolean, default=False)
     bot_type = db.Column(db.String(200), default="demo")
-    bot_path = db.Column(db.String(200))
+    bot_path = db.Column(db.String(2000))
+    bot_mimetype = db.Column(db.String(200))
     is_subscribe = db.Column(db.Boolean, default=False)
     sub_exp_date = db.Column(db.String(500), default="0")
 

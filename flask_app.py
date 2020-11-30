@@ -1,34 +1,119 @@
 from flask import Flask, request, jsonify, send_from_directory, render_template, flash, redirect, url_for
 from passlib.hash import md5_crypt
 from forms import MyForm, LoginForm, TestimonyForm 
-from models import User, Make_request, Testimonial, app, db, LoginManager, login_required, login_user, logout_user, current_user, Bet_49ja, Financial_data 
+from models import User, Make_request, Testimonial, app, db, LoginManager, login_required, login_user, logout_user, current_user, Bet_49ja, Financial_data, Transaction_Table, current_user
 from bet_49ja import bet_49ja_script
 from is_safe_url import is_safe_url
-import os
-import shutil
 from schema import user_schema
 from flask_humanize import Humanize
 from datetime import datetime
-import time
-
-
-import request_func
-import mailing_server
+from pypaystack import Transaction, Customer, Plan
 from mailing_server import mail_folks
-import basic_auth 
-# flash msg = Message('Hello', sender = 'dataslid@gmail.com', recipients = [email])
-# msg.body = f"Hello Flask message sent from Flask-Mail, the token is {random_generated} "
-# self.mail.send(msg)
-
+import boto3, botocore, time, hashlib, hmac, json, os, shutil, request_func, mailing_server, basic_auth, string, random
+# plesa login
 humanize = Humanize(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
-login_manager.login_message = "plesa login"
+login_manager.login_message = "please login"
 login_manager.login_message_category = "info"
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+@app.route("/callback", methods=["POST", "GET"])
+def paycallback():
+    if request.method == "POST":
+        data = request.json
+        event = data.get("event")
+        if event == "charge.success" and request.headers.get("X-Forwarded-For") in ['52.31.139.75', '52.49.173.169', '52.214.14.220']:
+            reference = data["data"].get("reference")
+            amount = data["data"].get('amount')
+            email = data["data"].get('customer').get('email')
+            cus_code = data["data"].get('customer').get('customer_code')
+            paid_at = data["data"].get('paidAt')
+            auth_code = data["data"].get('authorization').get('authorization_code')
+            paid_time = datetime.now()
+            get_transaction = Transaction_Table.query.filter_by(ref_no=reference).first()
+            get_transaction.amount = amount
+            get_transaction.auth_code = auth_code
+            get_transaction.cus_code =  cus_code
+            get_transaction.email = email
+            get_transaction.paid_at = paid_time
+            # Update User Table to reflect the payment made
+            update_user = User.query.filter_by(email=email).first()
+            # email=user_email, 
+            update_user.bet_49ja.is_paid_bot = True
+            update_user.bet_49ja.bot_type = "paid"
+            update_user.bet_49ja.has_compiled = False
+            update_user.bet_49ja.is_demo = False
+            # Commit the changes
+            db.session.commit()
+            
+        return f"{request.json}"
+    else:
+        return redirect("/dashboard")
+
+
+@app.route("/notify-and-compile")
+def compile_paid_bot():
+    user_bet9ja_name = request.args.get("q")
+    username = current_user.username
+    id = current_user.id
+    update_user = User.query.filter_by(id=id, email=email).first()
+    update_user.bet_49ja.is_building = True
+    update_user.bet_49ja.has_compiled = False
+    update_user.bet_49ja.bet9ja_username = user_bet9ja_name 
+    db.session.commit()
+    # Mail Admin
+    email = ods.environ.get("email") 
+    subject = "I have paid and there by requesting for my bot"
+    body = f"I have paid through paystack and I am hereby requesting for my 49ja bot, My bet9ja Username is {user_bet9ja_name}, My username is {user_name}"
+    mail_folks(email, subject, body)
+    # Mail Client
+    email = current_user.email
+    subject = "You request is processing"
+    body = f"Hi {user_name}, We have started building your bot and you will get notified when done, If the bot building takes too long, Make a Request on our site that would notify us"
+    mail_folks(email, subject, body)
+    
+    return "peace"
+
+@app.route("/paystack")
+def main():
+
+    """
+    All Response objects are a tuple containing status_code, status, message and data
+    """
+    # print(dir(request))
+    email = current_user.email
+    
+    paystack_secret = os.environ.get("paystack_test")
+    bot_price = 25000 * 100
+    #Instantiate the transaction object to handle transactions.  
+    #Pass in your authorization key - if not set as environment variable PAYSTACK_AUTHORIZATION_KEY
+    # email = "dataslid@gmail.com" "sk_test_faadf90960bad25e6a2b5c9be940792f928b73ac"
+    transaction = Transaction(authorization_key=paystack_secret)
+    transaction_table = Transaction_Table.query.filter_by(email=email).first()
+    if transaction_table:
+        response = transaction.charge(email, f"{transaction_table.auth_code}", int(transaction_table.amount)) #+rge a customer N100.
+        print(response)
+        reference = response[3].get('reference')
+        transaction = Transaction_Table(ref_no=reference)
+        db.session.add(transaction)
+        db.session.commit()
+        return redirect('/dashboard')
+    else:
+        init_transaction = transaction.initialize(email, bot_price)
+        reference = init_transaction[3].get('reference')
+        transaction = Transaction_Table(ref_no=reference)
+        db.session.add(transaction)
+        db.session.commit()
+        return redirect(init_transaction[3].get('authorization_url'))
+    
+
+
+
+
 
 # Redirect / to home
 @app.route("/", methods=["GET"])
@@ -48,7 +133,7 @@ def search():
     users_list = user_schema.dump(users)
     return {"users": users_list}
 
-@app.route("/admin", methods=["GET"])
+@app.route("/my-admin", methods=["GET"])
 @login_required
 def admin():
     users = User.query.all()
@@ -61,18 +146,46 @@ def manage_user():
     id =  request.args.get("id")
     user = User.query.get(id)
     if request.method == "POST":
-        make_admin = bool(request.form.get("admin"))
-        make_pay = bool(request.form.get("pay"))
-        user.is_admin = make_admin
-        if make_pay:
-            user.bet_49ja.is_paid_bot = make_pay
+        # print(request.form)
+        update_pay = request.form.get("pay")
+        update_admin = request.form.get("admin")
+        update_building = request.form.get("building")
+        user.is_admin = bool(update_admin)
+        user.bet_49ja.is_building = bool(update_building)
+        user.bet_49ja.is_paid_bot = bool(update_pay)
+        if bool(update_pay):
             user.bet_49ja.bot_type = "paid"
         else:
-            user.bet_49ja.is_paid_bot = make_pay
             user.bet_49ja.bot_type = "demo"
-        db.session.add(user)
+            
         db.session.commit()
-        
+        # Get files from Admin
+        botapp = request.files.get('botapp')
+        # print(botapp)
+        if botapp:
+            filename = botapp.filename
+            file_ext = filename.split('.')[1]
+            if file_ext == "exe":
+                storage_key = os.environ.get("aws_key")
+                storage_secret = os.environ.get("aws_secret")
+                storage_bucket = "betbots"
+                conn = boto3.client(
+                    's3',
+                    aws_access_key_id=storage_key,
+                    aws_secret_access_key=storage_secret
+                    )
+
+                key = f'user_bots/{filename}'
+                conn.upload_fileobj(botapp, storage_bucket, key)
+                user.bet_49ja.is_building = False
+                user.bet_49ja.has_compiled = True
+                user.bet_49ja.bot_path = key
+                db.session.commit()
+
+                flash(f"You have successfully update {user.username}'s ability and has uploaded files to S3")
+            else:
+                flash(f"The file uploaded must be an exe")
+
         flash(f"You have successfully update {user.username}'s ability")
         return redirect(f"/manage-user?id={user.id}")
 
@@ -149,10 +262,7 @@ def signup():
         flash("You have signed up successfully")    
         return redirect('/login')
     else:
-        print("HAAAAA")
-    return render_template("sign_up.html", form=form)
-
-
+        return render_template("sign_up.html", form=form)
 
 @app.route("/logout")
 def logout():
@@ -160,166 +270,9 @@ def logout():
     flash("You've logged out successfully, do visit soon")
     return redirect(url_for("login"))
 
-@app.route("/bought-bot?id=", methods=["GET"])
-def bought_bot():
-    return render_template("home.html")
-
-
-@app.route("/paid", methods=["POST", "GET"])
-def create():
-    name = request.args.get("q")
-    bet9ja = paid_49ja_script(name)
-
-    with open(f"{name}.py", "w") as f:
-        f.write(bet9ja)
-
-    os.system(f"workon flask & pyinstaller --onefile --clean --name={name}_49ja {name}.py") 
-    if "paid_folder" in os.listdir():
-        app_name = f"{name}_49ja.exe"
-        # Delete the application if it already exists
-        if  app_name in os.listdir(os.path.join(os.getcwd(), "paid_folder")):
-            os.remove(os.path.join(os.getcwd(), "paid_folder", app_name))
-
-        shutil.move(os.path.join(os.getcwd(), "dist", f"{name}_49ja.exe"), os.path.join(os.getcwd(), "paid_folder"))
-        os.remove(os.path.join(os.getcwd(), f"{name}_49ja.spec"))
-        os.remove(os.path.join(os.getcwd(), f"{name}.py"))
-        # Remove the remaining folder of dist
-        for directory, folder, files in os.walk(os.path.join(os.getcwd(), "dist")):            
-            for each_file in files:
-                os.remove(os.path.join(directory, each_file))
-        
-        # Remove all the remaining files of build
-        for directory, folder, files in os.walk(os.path.join(os.getcwd(), "build")):
-            for each_file in files:
-                os.remove(os.path.join(directory, each_file))
-   
-        # Remove the remaining folder of build 
-        for i in os.listdir(os.path.join(os.getcwd(), "build")):
-            os.rmdir(os.path.join(os.getcwd(), "build", i))
-
-        os.rmdir(os.path.join(os.getcwd(), "build"))
-        os.rmdir(os.path.join(os.getcwd(), "dist"))
-        paid_path = os.path.join(os.getcwd(), "paid_folder", app_name)
-        paid_info = Paid_49ja(user_id=current_user.id, is_updated=False, paid_bot=paid_path)
-        db.session.add(paid_info)
-        db.session.commit()
-
-    else:
-        os.system("mkdir paid_folder")
-        app_name = f"{name}_49ja.exe"
-        # Delete the application if it already exists
-        if  app_name in os.listdir(os.path.join(os.getcwd(), "paid_folder")):
-            os.remove(os.path.join(os.getcwd(), "paid_folder", app_name))
-        shutil.move(os.path.join(os.getcwd(), "dist", f"{name}_49ja.exe"), os.path.join(os.getcwd(), "paid_folder"))
-        os.remove(os.path.join(os.getcwd(), f"{name}_49ja.spec"))
-        os.remove(os.path.join(os.getcwd(), f"{name}.py"))
-        
-        # Remove the remaining folder of dist
-        for directory, folder, files in os.walk(os.path.join(os.getcwd(), "dist")):            
-            for each_file in files:
-                os.remove(os.path.join(directory, each_file))
-        # Remove the remaining folder of build 
-        for i in os.listdir(os.path.join(os.getcwd(), "build")):
-            os.rmdir(os.path.join(os.getcwd(), "build", i))
-        
-        # Remove all the remaining files of build
-        for directory, folder, files in os.walk(os.path.join(os.getcwd(), "build")):
-            for each_file in files:
-                os.remove(os.path.join(directory, each_file))
-
-        os.rmdir(os.path.join(os.getcwd(), "build"))
-        os.rmdir(os.path.join(os.getcwd(), "dist"))
-        
-        paid_path = os.path.join(os.getcwd(), "paid_folder", app_name)
-        paid_info = Paid_49ja(user_id=current_user.id, is_updated=False, paid_bot=paid_path)
-        db.session.add(paid_info)
-        db.session.commit()
-        
-    return f"{name}_paid.py created"
-
-@app.route("/get-bot", methods=["POST", "GET"])
-@login_required
-def compile_and_upload_bot():
-    name = request.args.get("q")
-    version = request.args.get("v")
-    userId = request.args.get("user_id")
-    remote_url = request.args.get("url")
-
-    bet_49ja = bet_49ja_script(name, version, remote_url, userId)
-
-    with open(f"{name}.py", "w") as f:
-        f.write(bet_49ja)
-    if version == "demo":
-        os.system(f"workon flask & pyinstaller --onefile --clean --name={name}_49ja_demo {name}.py") 
-        if "49ja_folder" in os.listdir():
-            app_name = create_app(name)
-            upload_to_s3(app_name)
-        else:
-            os.system("mkdir 49ja_folder")
-            app_name = create_app(name, version)
-            # Upload the file generate to s3
-            upload_to_s3(app_name)
-        
-    return f"{name}_demo.py created"
-
-def upload_to_s3():
-    aws_key= "AKIA5NZ7IZHALP2IU3MI",
-    EMAIL = "dataslid@gmail.com",
-    aws_secret = "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",
-    AWS_STORAGE_BUCKET_NAME = "betbots",
-    DB_PASSWORD = "dataslid007"
-    conn = boto3.client(
-        's3',
-        aws_access_key_id="AKIA5NZ7IZHALP2IU3MI",
-        aws_secret_access_key="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"
-
-        )
-    bucket_name = "betbots"
-    filename = os.path.join(os.getcwd(), "49ja_folder", name)
-    file_folder = f'demo_49ja/{name}'
-    conn.upload_file(filename, bucket_name, file_folder)
-    
-    return "success"
-
-def create_app(name, version):
-    if version == "demo":
-        app_name = f"{name}_49ja_demo.exe"
-    elif version == "paid":
-        pass
-    elif version == "subscribe":
-        pass
-    # Delete the application if it already exists
-    if  app_name in os.listdir(os.path.join(os.getcwd(), "49ja_folder")):
-        os.remove(os.path.join(os.getcwd(), "49ja_folder", app_name))
-
-    shutil.move(os.path.join(os.getcwd(), "dist", f"{name}_49ja_demo.exe"), os.path.join(os.getcwd(), "49ja_folder"))
-    os.remove(os.path.join(os.getcwd(), f"{name}_49ja_demo.spec"))
-    os.remove(os.path.join(os.getcwd(), f"{name}.py"))
-    # Remove the remaining folder of dist
-    for directory, folder, files in os.walk(os.path.join(os.getcwd(), "dist")):            
-        for each_file in files:
-            os.remove(os.path.join(directory, each_file))
-    
-    # Remove all the remaining files of build
-    for directory, folder, files in os.walk(os.path.join(os.getcwd(), "build")):
-        for each_file in files:
-            os.remove(os.path.join(directory, each_file))
-
-    # Remove the remaining folder of build 
-    for i in os.listdir(os.path.join(os.getcwd(), "build")):
-        os.rmdir(os.path.join(os.getcwd(), "build", i))
-
-    os.rmdir(os.path.join(os.getcwd(), "build"))
-    os.rmdir(os.path.join(os.getcwd(), "dist"))
-    bot_path = os.path.join(os.getcwd(), "49ja_folder", app_name)
-    # Update the User bet9ja 49js status
-    bot_info = Bet_49ja.query.filter_by(user_id=current_user.id).first()
-    print(bot_info)
-    bot_info.has_compiled = True 
-    bot_info.bot_path = bot_path
-    db.session.commit()
-    return app_name
-
+# @app.route("/bought-bot?id=", methods=["GET"])
+# def download():
+#     return render_template("home.html")
 
 @app.route("/subscribe", methods=["GET"])
 def subscribe():
@@ -356,21 +309,6 @@ def check_subscription():
     else:
         return jsonify({"result": ""})
 
-
-
-@app.route("/download", methods=["POST", "GET"])
-@login_required
-def download():
-    if current_user.has_paid:
-        pass
-    else:
-        print(current_user.demo_49ja)
-        demo_path = current_user.demo_49ja.demo
-        print(demo_path)
-        flash("downloading...")
-        return send_from_directory(r"C:\Users\Olabode\Desktop\49ja server\49ja_folder", "xxxxxx_49ja.exe")
-
-
 @app.context_processor
 def context_processor():
     request_alert = Make_request.query.filter_by(not_seen=True).all()
@@ -380,4 +318,4 @@ def context_processor():
     return dict(alert=alert)
 
 if __name__  == '__main__':
-    app.run(debug=True, host="0.0.0.0")
+    app.run(debug=True, host="0.0.0.0", port="5000")
